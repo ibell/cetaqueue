@@ -1,18 +1,21 @@
 version: '3.2'
 
 services:
-  app:
+  producer:
     build:
        context: ./
-       dockerfile: app.Dockerfile
-    ports:
-      - '8003:5000'
+       dockerfile: producer.Dockerfile
     links:
       - mongo
-    volumes:
-      - type: bind
-        source: "./"
-        target: /app
+    environment:
+      WAIT_HOSTS: mongo:27017
+
+  results:
+    build:
+       context: ./
+       dockerfile: consumer.Dockerfile
+    links:
+      - mongo
     environment:
       WAIT_HOSTS: mongo:27017
 
