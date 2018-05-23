@@ -4,6 +4,11 @@ import gridfs
 import time
 import io
 import zipfile
+import tempfile
+import os
+from bson import ObjectId
+import subprocess 
+import sys
 
 client = pymongo.MongoClient('localhost',
         username='rooty',
@@ -14,7 +19,7 @@ queue = db.queue
 
 try:
     while True:
-        time.sleep(2)
+        time.sleep(0.01)
         job = None
         # 
         with client.start_session(causal_consistency=True) as session:
@@ -27,7 +32,27 @@ try:
 
         if job is not None:
 
-            time.sleep(2)
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                # Write the Dockerfile from the job spec
+                with open(os.path.join(tmpdirname, "Dockerfile"),'w') as fp:
+                    fp.write(job['Dockerfile'])
+                    
+                # Get the input data and write to file
+                fs = gridfs.GridFS(db)
+                file_ = fs.get(ObjectId(job['data_id']))  
+                fname = os.path.join(tmpdirname, file_.filename)
+                with open(fname, 'wb') as fp:
+                    fp.write(file_.read())
+                    
+                # Unpack the data to the root of the temporary folder
+                with zipfile.ZipFile(fname) as myzip:
+                    myzip.printdir()
+                    myzip.extractall(path=tmpdirname)
+                    
+                # 
+                subprocess.check_call('docker image build -t job .', shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr= sys.stderr)
+                
+                subprocess.check_call('docker container run job', shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr= sys.stderr)
 
             # Push fake result data
             # See https://stackoverflow.com/a/44946732/1360263  

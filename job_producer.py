@@ -24,13 +24,12 @@ if __name__=='__main__':
             # See https://stackoverflow.com/a/44946732/1360263  
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                for file_name, data in [('1.txt', io.BytesIO(b'1'*10000000)), ('2.txt', io.BytesIO(b'222'))]:
-                    zip_file.writestr(file_name, data.getvalue())
+                zip_file.write("simple.py")
             data_id = fs.put(zip_buffer.getvalue(), filename='result.zip', mimetype ='application/zip', session=session)
             
             job_info = {
                 'status': 'waiting',
-                'Dockerfile': '',
+                'Dockerfile': open('simple.Dockerfile','r').read(),
                 'data_id': data_id,
                 'result_id': None
             }
