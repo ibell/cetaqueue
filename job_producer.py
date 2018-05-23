@@ -38,4 +38,4 @@ if __name__=='__main__':
             
             print('job pushed to db @ '+str(job_id))
 
-        time.sleep(2.0)
+        time.sleep(10.0)

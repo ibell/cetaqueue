@@ -9,15 +9,15 @@
     <table>
         <tr id="row">
             <th class="status">Status</th>
-            <th class="data_id">DataId</th>
-            <th class="result_id">Result_id</th>
+            <th class="data_id">data_id</th>
+            <th class="result_id">result_id</th>
             <th class="deleter">Delete</th>
         </tr>
     {% for item in items %}
         <tr class="datas">
             <td class="status">{{ item.status }}</td>
-            <td class="data_id"><a href="./downloadfile?_id={{ item.data_id }}"><button type="submit">{{ item.data_id}} </button></a></td>
-            <td class="result_id">{{ item.result_id }}</td>
+            <td class="data_id"><a href="./downloadfile?_id={{ item.data_id }}"><button type="submit">{{ item.data_id }} </button></a></td>
+            <td class="result_id"><a href="./downloadfile?_id={{ item.result_id }}"><button type="submit">{{ item.result_id }} </button></a></td>
             <td class="deleter"><a href="./remove?_id={{ item._id }}"><button type="submit">DELETE</button></a></td>
         </tr>
     {% endfor %}
