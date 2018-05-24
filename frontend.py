@@ -3,6 +3,7 @@ from flask import Flask, redirect, url_for, request, render_template,make_respon
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import gridfs
+from werkzeug import secure_filename
 
 app = Flask(__name__)
 
@@ -11,6 +12,44 @@ client = MongoClient('mongo', 27017,
                      password='passy')
 db = client.my_db
 
+@app.route('/add_job', methods=['GET', 'POST'])
+def add_job():
+    if request.method == 'POST':
+        file = request.files['file']
+        filename = secure_filename(file.filename)
+        fs = gridfs.GridFS(db)
+        data_id = fs.put(file, mimetype=file.content_type, filename=filename)
+        
+        job_info = {
+            'status': 'waiting',
+            'Dockerfile': request.form['Dockerfile'],
+            'data_id': data_id,
+            'result_id': None
+        }
+        job_id = db.queue.insert_one(job_info)
+        
+        print('job pushed to db @ '+str(job_id))
+            
+        return redirect("/")
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <title>Upload new file</title>
+    </head>
+    <body>
+    <h1>Upload new file</h1>
+    <form action="" method="post" enctype="multipart/form-data">
+    <label for="Dockerfile">Dockerfile</label>
+    <TEXTAREA name="Dockerfile" rows="20" cols="80">The contents of Dockerfile</TEXTAREA>
+    <label for="file">File</label>
+    <p><input type="file" name="file"></p>
+    <p><input type="submit" value="Upload"></p>
+    </form>
+    </body>
+    </html>
+    '''
+    
 @app.route('/')
 def frontend():
     return render_template('frontend.html', items=list(db.queue.find()))
