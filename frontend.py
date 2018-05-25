@@ -40,10 +40,11 @@ def add_job():
     <body>
     <h1>Upload new file</h1>
     <form action="" method="post" enctype="multipart/form-data">
+    <p>
     <label for="Dockerfile">Dockerfile</label>
-    <TEXTAREA name="Dockerfile" rows="20" cols="80">The contents of Dockerfile</TEXTAREA>
-    <label for="file">File</label>
-    <p><input type="file" name="file"></p>
+    <TEXTAREA name="Dockerfile" rows="20" cols="80">The contents of Dockerfile</TEXTAREA></p>
+    <p><label for="file">File</label>
+    <input type="file" name="file"></p>
     <p><input type="submit" value="Upload"></p>
     </form>
     </body>
