@@ -12,6 +12,7 @@
             <th class="data_id">data_id</th>
             <th class="result_id">result_id</th>
             <th class="deleter">Delete</th>
+            <th class="deleter">stdio</th>
         </tr>
     {% for item in items %}
         <tr class="datas">
@@ -19,6 +20,7 @@
             <td class="data_id"><a href="./downloadfile?_id={{ item.data_id }}"><button type="submit">{{ item.data_id }} </button></a></td>
             <td class="result_id"><a href="./downloadfile?_id={{ item.result_id }}"><button type="submit">{{ item.result_id }} </button></a></td>
             <td class="deleter"><a href="./remove?_id={{ item._id }}"><button type="submit">DELETE</button></a></td>
+            <td class="stdout"><a href="./view_stdout?_id={{ item._id }}"><button type="submit">STDOUT</button></a></td>
         </tr>
     {% endfor %}
 </table>

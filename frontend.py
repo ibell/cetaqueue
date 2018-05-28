@@ -30,7 +30,7 @@ def add_job():
         
         print('job pushed to db @ '+str(job_id))
             
-        return redirect("/")
+        return redirect(url_for('frontend'))
     return '''
     <!DOCTYPE html>
     <html>
@@ -61,7 +61,13 @@ def remove():
     # Deleting a job from the queue
     key=request.values.get("_id")
     db.queue.remove({"_id":ObjectId(key)})
-    return redirect("/")
+    return redirect(url_for('frontend'))
+
+@app.route('/view_stdout')
+def view_stdout():
+    key = request.values.get("_id")
+    job = db.queue.find_one({"_id":ObjectId(key)})
+    return job.get('stdout','No stdout')
 
 @app.route('/downloadfile')
 def downloadfile():
