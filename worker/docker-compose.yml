@@ -1,0 +1,17 @@
+version: '3.2'
+
+services:
+  worker:
+    build:
+      context: ./
+      dockerfile: worker.Dockerfile
+    extra_hosts:
+       - "outside:172.17.0.1"
+    privileged: true
+
+    # Share the docker socket with the container
+    # See also https://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
