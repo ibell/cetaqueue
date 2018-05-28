@@ -52,24 +52,37 @@ try:
                     with zipfile.ZipFile(fname) as myzip:
                         myzip.printdir()
                         myzip.extractall(path=tmpdirname)
+                        
+                    stdout_path = os.path.join(tmpdirname,'mystdout.txt')
+                    stderr_path = os.path.join(tmpdirname,'mystderr.txt')
+                    with open(stdout_path,'w') as fp_out:
+                        with open(stderr_path,'w') as fp_err:
 
-                    # Build the image for the job
-                    subprocess.check_call('docker image build -t job .', shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr= sys.stderr)
+                            # Build the image for the job
+                            subprocess.check_call('docker image build -t job .', shell=True, cwd=tmpdirname, stdout = fp_out, stderr = fp_err)
+                            
+                            # Run the container
+                            fp_out.write('About to run container...')
+                            subprocess.check_call('docker container run job', shell=True, cwd=tmpdirname, stdout = fp_out, stderr = fp_err)
 
-                    # Run the container
-                    print('about to run container')
-                    subprocess.check_call('docker container run job', shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr= sys.stderr)
+                    # Push fake result data
+                    # See https://stackoverflow.com/a/44946732/1360263  
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                        for file_name, data in [('1.txt', io.BytesIO(b'1'*10000000)), ('2.txt', io.BytesIO(b'222'))]:
+                            zip_file.writestr(file_name, data.getvalue())
+                    fs = gridfs.GridFS(db)
+                    result_id = fs.put(zip_buffer.getvalue(), filename='result.zip', mimetype ='application/zip')
+                    
+                    stdout = open(stdout_path).read() if os.path.exists(stdout_path) else 'No stdout'
+                    stderr = open(stderr_path).read() if os.path.exists(stderr_path) else 'No stderr'
 
-                # Push fake result data
-                # See https://stackoverflow.com/a/44946732/1360263  
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                    for file_name, data in [('1.txt', io.BytesIO(b'1'*10000000)), ('2.txt', io.BytesIO(b'222'))]:
-                        zip_file.writestr(file_name, data.getvalue())
-                fs = gridfs.GridFS(db)
-                result_id = fs.put(zip_buffer.getvalue(), filename='result.zip', mimetype ='application/zip')
-
-                queue.update_one({'_id': job['_id']}, {'$set': {'status': 'done', 'result_id': result_id}})
+                    queue.update_one({'_id': job['_id']}, {'$set': {
+                        'status': 'done', 
+                        'result_id': result_id, 
+                        'stdout': stdout,
+                        'stderr': stderr
+                    }})
                 
             except BaseException as BE:
                 queue.update_one({'_id': job['_id']}, {'$set': {'status': 'failed', 'result_id': None, 'message': str(BE)}})
