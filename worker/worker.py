@@ -5,6 +5,7 @@ import tempfile
 import subprocess
 import sys
 import os
+import shutil
 
 import pymongo
 from pymongo import MongoClient
@@ -34,12 +35,20 @@ try:
                 job = grid_out
 
         if job is not None:
-            try:
-                with tempfile.TemporaryDirectory() as tmpdirname:
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                # Get the paths to files where output will be written
+                stdout_path = os.path.join(tmpdirname,'mystdout.txt')
+                stderr_path = os.path.join(tmpdirname,'mystderr.txt')
+                
+                try:
                     
                     # Write the Dockerfile from the job spec
                     with open(os.path.join(tmpdirname, "Dockerfile"),'w') as fp:
                         fp.write(job['Dockerfile'])
+                    # Grab the docker-compose file for the build
+                    shutil.copy2('/docker-compose.yml',tmpdirname)
+                    # Print it out, just for debugging
+                    print(open('docker-compose.yml').read())
 
                     # Get the input data and write to file
                     fs = gridfs.GridFS(db)
@@ -53,26 +62,32 @@ try:
                         myzip.printdir()
                         myzip.extractall(path=tmpdirname)
                         
-                    stdout_path = os.path.join(tmpdirname,'mystdout.txt')
-                    stderr_path = os.path.join(tmpdirname,'mystderr.txt')
+                    stdout_save = sys.stdout
+                    stderr_save = sys.stderr
+                    
+                    # Make the output folder
+                    output_path = os.path.join(tmpdirname,'output')
+                    os.makedirs(output_path)
+                    subprocess.check_call('ls -al', shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr = sys.stderr)
+                    
                     with open(stdout_path,'w') as fp_out:
                         with open(stderr_path,'w') as fp_err:
-
-                            # Build the image for the job
-                            subprocess.check_call('docker image build -t job .', shell=True, cwd=tmpdirname, stdout = fp_out, stderr = fp_err)
                             
-                            # Run the container
-                            fp_out.write('About to run container...')
-                            subprocess.check_call('docker container run job', shell=True, cwd=tmpdirname, stdout = fp_out, stderr = fp_err)
+                            ## tee the output to both file and terminal
+                            #sys.stdout = stream_tee(stdout_save, fp_out)
+                            #sys.stderr = stream_tee(stderr_save, fp_err)
 
-                    # Push fake result data
-                    # See https://stackoverflow.com/a/44946732/1360263  
-                    zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
-                        for file_name, data in [('1.txt', io.BytesIO(b'1'*10000000)), ('2.txt', io.BytesIO(b'222'))]:
-                            zip_file.writestr(file_name, data.getvalue())
-                    fs = gridfs.GridFS(db)
-                    result_id = fs.put(zip_buffer.getvalue(), filename='result.zip', mimetype ='application/zip')
+                            # Build and run the job
+                            fp_out.write('About to run container...')
+                            subprocess.check_call('docker-compose up --build', shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr = sys.stderr)
+                            
+                    # Zip up the output folder
+                    shutil.make_archive(os.path.join(tmpdirname,'output'),'zip',output_path)
+                    subprocess.check_call('ls -al', shell=True, cwd=tmpdirname+'/output', stdout = sys.stdout, stderr = sys.stderr)
+                    
+                    # Send the zip back to the db
+                    with open(os.path.join(tmpdirname,'output.zip'),'rb') as fp:
+                        result_id = fs.put(fp.read(), filename='output.zip', mimetype ='application/zip')
                     
                     stdout = open(stdout_path).read() if os.path.exists(stdout_path) else 'No stdout'
                     stderr = open(stderr_path).read() if os.path.exists(stderr_path) else 'No stderr'
@@ -84,10 +99,21 @@ try:
                         'stderr': stderr
                     }})
                 
-            except BaseException as BE:
-                queue.update_one({'_id': job['_id']}, {'$set': {'status': 'failed', 'result_id': None, 'message': str(BE)}})
+                except BaseException as BE:
+                    stdout = open(stdout_path).read() if os.path.exists(stdout_path) else 'No stdout'
+                    stderr = open(stderr_path).read() if os.path.exists(stderr_path) else 'No stderr'
+                    print(str(BE))
+                    queue.update_one({'_id': job['_id']}, {'$set': {
+                        'status': 'failed', 
+                        'result_id': None, 
+                        'message': str(BE),
+                        'stdout': stdout,
+                        'stderr': stderr
+                    }})
 
             print(queue.find_one({'_id': job['_id']}))
 
 except KeyboardInterrupt:
     print('Stopping...')
+    
+print('Goodbye...')
