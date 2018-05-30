@@ -67,7 +67,19 @@ def remove():
 def view_stdout():
     key = request.values.get("_id")
     job = db.queue.find_one({"_id":ObjectId(key)})
-    return job.get('stdout','No stdout')
+    if job is None:
+        return 'None'
+    else:
+        return job.get('stdout','No stdout').replace('\n','<br>')
+
+@app.route('/view_stderr')
+def view_stderr():
+    key = request.values.get("_id")
+    job = db.queue.find_one({"_id":ObjectId(key)})
+    if job is None:
+        return 'None'
+    else:
+        return job.get('stderr','No stderr').replace('\n','<br>')
 
 @app.route('/downloadfile')
 def downloadfile():
