@@ -111,25 +111,27 @@ try:
                             ## tee the output to both file and terminal
                             #sys.stdout = stream_tee(stdout_save, fp_out)
                             #sys.stderr = stream_tee(stderr_save, fp_err)
-                            
+
                             the_volume = os.path.split(tmpdirname)[1]+'_output'
-                            
+
                             cmns = dict(shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr = sys.stderr)
+
 
                             # Build and run the job
                             fp_out.write('About to run container...')
                             subprocess.check_call('docker-compose up --build', **cmns)
                             subprocess.check_call('docker-compose down', **cmns)
-          
+
                             # Copy the files out of the volume that was attached to the container
                             # by spinning up another mini-container
+                            # Idea from: https://stackoverflow.com/a/37469637/1360263
                             subprocess.check_call('docker run -v '+the_volume+':/output --name helper busybox true', **cmns)
                             subprocess.check_call('docker cp helper:/output .', **cmns)
                             subprocess.check_call('docker rm helper', **cmns)
                             subprocess.check_call('docker volume rm '+the_volume, **cmns)
 
                     # Zip up the output folder
-                    shutil.make_archive(os.path.join(tmpdirname,'output'),'zip',(os.path.join(tmpdirname,'output/')))
+                    shutil.make_archive(os.path.join(tmpdirname,'output'),'zip',(os.path.join(tmpdirname,'output/job')))
 
                     # Send the zip back to the db
                     with open(os.path.join(tmpdirname,'output.zip'),'rb') as fp:

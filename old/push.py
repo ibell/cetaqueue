@@ -11,3 +11,6 @@ files = {'file': ('data.zip', open(zname, 'rb'), 'application/zip')}
 Dockerfile = open(dname).read()
 r = requests.post(url, files=files, data= dict(Dockerfile=Dockerfile))
 print(r.text)
+
+if os.path.exists(zname):
+    os.remove(zname)
