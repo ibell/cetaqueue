@@ -11,10 +11,12 @@ RUN curl -fsSL get.docker.com -o get-docker.sh && \
 # that it can launch child docker instances
 RUN groupadd -g 628 baleen && \
     useradd -r -u 628 -g baleen baleen && \
-    usermod -aG docker baleen
+    groupadd -g 629 gris && \
+    useradd -r -u 629 -g gris gris && \
+    usermod -aG docker gris
 
 # Switch to our user
-USER baleen
+USER gris
 
 ADD worker.py .
 ADD worker_entrypoint.sh .
