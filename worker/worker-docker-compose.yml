@@ -2,14 +2,14 @@ version: '3.2'
 
 services:
   job:
-#    user: '628:628'
     build:
       context: ./
       dockerfile: Dockerfile
     volumes:
-      - source: ./output
-        target: /output
-        type: volume
+      - type: volume
+        source: output
+        target: /mount
     
 volumes:
-    output:
+  output:
+    
