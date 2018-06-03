@@ -31,14 +31,14 @@ FROM continuumio/miniconda3
 COPY simple.py .
 CMD python -u simple.py
 ```
-where simple.py does nothing more than 
-```
+where ``simple.py`` does nothing more than 
+``` python
 import os
 with open("/output/hihihihihi.txt",'w') as fp:
    fp.write('hello')
 ```
-A script that will post this job with the ``requests``  library reads like
-```
+A Python script that will post this job with the ``requests``  library reads like
+``` python
 import requests, os, zipfile
 url = 'http://localhost:5000/add_job'
 
