@@ -54,6 +54,104 @@ RUN set -ex; \
 
 ENTRYPOINT ["/entrypoint.sh"]
 """
+
+class StdErrTeer(object):
+    def __init__(self, file_stream):
+        self.old_stderr = sys.stderr
+        self.file_obj = file_stream
+        # Point the stream to me
+        sys.stderr = self
+    
+    def __enter__(self):
+        pass
+    
+    def __exit__(self, type, value, traceback):
+        self.file_obj.close()
+        sys.stderr = self.old_stderr
+    
+    def write(self, data):
+        self.file_obj.write(data)
+        self.file_obj.flush()
+        self.old_stderr.write(data)
+        self.old_stderr.flush()
+        
+    def fileno(self):
+        return self.file_obj.fileno()
+        
+    def flush(self):
+        pass
+    
+class StdOutTeer(object):
+    def __init__(self, file_stream):
+        self.old_stdout = sys.stdout
+        self.file_obj = file_stream
+        # Point the stream to me
+        sys.stdout = self
+    
+    def __enter__(self):
+        pass
+    
+    def __exit__(self, type, value, traceback):
+        self.file_obj.close()
+        sys.stdout = self.old_stdout
+    
+    def write(self, data):
+        self.file_obj.write(data)
+        self.file_obj.flush()
+        self.old_stdout.write(data)
+        self.old_stdout.flush()
+        
+    def fileno(self):
+        return self.file_obj.fileno()
+        
+    def flush(self):
+        pass
+    
+def subprocess_redirected(cmd, path, **kwargs):
+    """
+    Run a subprocess, piping all output to terminal via parallel stdout and stderr pipes,
+    as well as to temporary files.
+    
+    In a caller function, the stdout and stderr can be redirected to file and the 
+    normal location.  See the Redirector class
+    """
+    
+    callback = kwargs.pop('callback', None)
+    delay_s = kwargs.pop('delay_s', 1.0)
+    
+    path_out = os.path.join(path, 'buff_stdout')
+    path_err = os.path.join(path, 'buff_stderr')
+    
+    with open(path_out,'w') as write_out, \
+         open(path_out,'r',1) as read_out, \
+         open(path_err,'w') as write_err, \
+         open(path_err,'r',1) as read_err:
+             
+        kwargs['stdout'] = write_out
+        kwargs['stderr'] = write_err
+
+        # Start the process, redirecting to the file buffers
+        process = subprocess.Popen(command, **kwargs)
+        while process.poll() is None: # poll() value of None indicates still working
+            sys.stdout.write(read_out.read())
+            sys.stderr.write(read_err.read())
+            time.sleep(0.05)
+            if callback is not None:
+                callback()
+                
+        # Read the remaining
+        sys.stdout.write(read_out.read())
+        sys.stderr.write(read_err.read())
+        
+        # Check the return code
+        rc = process.returncode
+        if rc != 0:
+            raise ValueError("Process returned with error code "+rc)
+        
+    for fname in path_err, path_out:
+        if os.path.exists(fname):
+            os.remove(fname)
+    
 try:
     while True:
         time.sleep(0.01)
@@ -75,79 +173,78 @@ try:
                 stderr_path = os.path.join(tmpdirname,'mystderr.txt')
                 
                 try:
-                    # Write the Dockerfile from the job spec
-                    Dockerfile = job['Dockerfile'] + foot
-                    print('Dockerfile\n==========')
-                    print(Dockerfile)
-                    with open(os.path.join(tmpdirname, "Dockerfile"),'w') as fp:
-                        fp.write(Dockerfile)
-                    
-                    # Grab the docker-compose file for the build
-                    shutil.copy2('/docker-compose.yml',tmpdirname)
-                    shutil.copy2('/worker_entrypoint.sh',tmpdirname)
+                    with StdOutTeer(open(stdout_path,'w')) as redir_out, \
+                         StdErrTeer(open(stderr_path,'w')) as redir_err:
+                            
+                        # Write the Dockerfile from the job spec
+                        Dockerfile = job['Dockerfile'] + foot
+                        print('Dockerfile\n==========')
+                        print(Dockerfile)
+                        with open(os.path.join(tmpdirname, "Dockerfile"),'w') as fp:
+                            fp.write(Dockerfile)
+                        
+                        # Grab the docker-compose file for the build
+                        shutil.copy2('/docker-compose.yml',tmpdirname)
+                        shutil.copy2('/worker_entrypoint.sh',tmpdirname)
 
-                    # Print it out, just for debugging
-                    print('docker-compose\n==========')
-                    print(open('docker-compose.yml').read())
+                        # Print it out, just for debugging
+                        print('docker-compose\n==========')
+                        print(open('docker-compose.yml').read())
 
-                    # Get the input data and write to file
-                    fs = gridfs.GridFS(db)
-                    file_ = fs.get(ObjectId(job['data_id']))  
-                    fname = os.path.join(tmpdirname, file_.filename)
-                    with open(fname, 'wb') as fp:
-                        fp.write(file_.read())
+                        # Get the input data and write to file
+                        fs = gridfs.GridFS(db)
+                        file_ = fs.get(ObjectId(job['data_id']))  
+                        fname = os.path.join(tmpdirname, file_.filename)
+                        with open(fname, 'wb') as fp:
+                            fp.write(file_.read())
 
-                    # Unpack the data to the root of the temporary folder
-                    with zipfile.ZipFile(fname) as myzip:
-                        myzip.printdir()
-                        myzip.extractall(path=tmpdirname)
+                        # Unpack the data to the root of the temporary folder
+                        with zipfile.ZipFile(fname) as myzip:
+                            myzip.printdir()
+                            myzip.extractall(path=tmpdirname)
 
-                    stdout_save = sys.stdout
-                    stderr_save = sys.stderr
+                        # Build and run the job
+                        print('About to run container...')
+                        
+                        # Copy the files out of the volume that was attached to the container
+                        # by spinning up another mini-container
+                        # Idea from: https://stackoverflow.com/a/37469637/1360263
+                        
+                        the_volume = os.path.split(tmpdirname)[1] + '_output'
+                        helper = 'helper_' + os.path.split(tmpdirname)[1]
+                        for command in ['docker-compose up --build',
+                                        'docker-compose down',
+                                        'docker run -v '+the_volume+':/output --name '+helper+' busybox true',
+                                        'docker cp '+helper+':/output .',
+                                        'docker rm '+helper,
+                                        'docker volume rm '+the_volume
+                                        ]:
+                            subprocess_redirected(command, tmpdirname, shell=True, cwd=tmpdirname)
 
-                    with open(stdout_path,'w') as fp_out:
-                        with open(stderr_path,'w') as fp_err:
+                        # Zip up the output folder
+                        shutil.make_archive(os.path.join(tmpdirname,'output'),'zip',(os.path.join(tmpdirname,'output/job')))
 
-                            ## tee the output to both file and terminal
-                            #sys.stdout = stream_tee(stdout_save, fp_out)
-                            #sys.stderr = stream_tee(stderr_save, fp_err)
+                        # Send the zip back to the db
+                        with open(os.path.join(tmpdirname,'output.zip'),'rb') as fp:
+                            result_id = fs.put(fp.read(), filename='output.zip', mimetype ='application/zip')
+                            
+                        print('ready to push')
 
-                            the_volume = os.path.split(tmpdirname)[1]+'_output'
-
-                            cmns = dict(shell=True, cwd=tmpdirname, stdout = sys.stdout, stderr = sys.stderr)
-
-
-                            # Build and run the job
-                            fp_out.write('About to run container...')
-                            subprocess.check_call('docker-compose up --build', **cmns)
-                            subprocess.check_call('docker-compose down', **cmns)
-
-                            # Copy the files out of the volume that was attached to the container
-                            # by spinning up another mini-container
-                            # Idea from: https://stackoverflow.com/a/37469637/1360263
-                            subprocess.check_call('docker run -v '+the_volume+':/output --name helper busybox true', **cmns)
-                            subprocess.check_call('docker cp helper:/output .', **cmns)
-                            subprocess.check_call('docker rm helper', **cmns)
-                            subprocess.check_call('docker volume rm '+the_volume, **cmns)
-
-                    # Zip up the output folder
-                    shutil.make_archive(os.path.join(tmpdirname,'output'),'zip',(os.path.join(tmpdirname,'output/job')))
-
-                    # Send the zip back to the db
-                    with open(os.path.join(tmpdirname,'output.zip'),'rb') as fp:
-                        result_id = fs.put(fp.read(), filename='output.zip', mimetype ='application/zip')
-
-                    stdout = open(stdout_path).read() if os.path.exists(stdout_path) else 'No stdout'
-                    stderr = open(stderr_path).read() if os.path.exists(stderr_path) else 'No stderr'
-
-                    queue.update_one({'_id': job['_id']}, {'$set': {
-                        'status': 'done', 
-                        'result_id': result_id, 
-                        'stdout': stdout,
-                        'stderr': stderr
-                    }})
+                        stdout = open(stdout_path).read() if os.path.exists(stdout_path) else 'No stdout'
+                        stderr = open(stderr_path).read() if os.path.exists(stderr_path) else 'No stderr'
+                        print('stdout(len:{0:d}): {1:s}'.format(len(stdout),stdout))
+                        print('stderr(len:{0:d}): {1:s}'.format(len(stderr),stderr))
+                        
+                        queue.update_one({'_id': job['_id']}, {'$set': {
+                            'status': 'done', 
+                            'result_id': result_id, 
+                            'stdout': stdout,
+                            'stderr': stderr
+                        }})
 
                 except BaseException as BE:
+                    
+                    print('ERROR')
                     stdout = open(stdout_path).read() if os.path.exists(stdout_path) else 'No stdout'
                     stderr = open(stderr_path).read() if os.path.exists(stderr_path) else 'No stderr'
                     print(str(BE))
