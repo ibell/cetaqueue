@@ -23,7 +23,7 @@ queue = db.queue
 
 foot = r"""
 
-ADD worker_entrypoint.sh ./entrypoint.sh
+ADD worker_entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Add user baleen and put it into its own group and also the docker group so
