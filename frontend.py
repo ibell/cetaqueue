@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 import gridfs
 from werkzeug import secure_filename
+from ansi2html import Ansi2HTMLConverter
 
 app = Flask(__name__)
 
@@ -65,12 +66,14 @@ def remove():
 
 @app.route('/view_stdout')
 def view_stdout():
+    # See https://pypi.org/project/ansi2html/ for colored ansi -> HTML conversions
     key = request.values.get("_id")
     job = db.queue.find_one({"_id":ObjectId(key)})
     if job is None:
         return 'None'
     else:
-        return job.get('stdout','No stdout').replace('\n','<br>')
+        contents = job.get('stdout','No stdout')
+        return Ansi2HTMLConverter().convert(contents)
 
 @app.route('/view_stderr')
 def view_stderr():
@@ -79,7 +82,8 @@ def view_stderr():
     if job is None:
         return 'None'
     else:
-        return job.get('stderr','No stderr').replace('\n','<br>')
+        contents = job.get('stderr','No stderr')
+        return Ansi2HTMLConverter().convert(contents)
 
 @app.route('/downloadfile')
 def downloadfile():

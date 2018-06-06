@@ -1,6 +1,6 @@
 FROM continuumio/miniconda3
 
-RUN apt-get update -y -qq && pip install pymongo flask
+RUN apt-get update -y -qq && pip install pymongo flask ansi2html
 
 COPY frontend.py .
 COPY templates templates
