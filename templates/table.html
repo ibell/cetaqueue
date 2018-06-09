@@ -1,0 +1,11 @@
+{% for item in items %}
+    <tr class="datas">
+        <td class="status">{{ item.status }}</td>
+        <td class="date">{{ item.date }}</td>
+        <td class="data_id"><a href="./downloadfile?_id={{ item.data_id }}"><button type="submit">DOWNLOAD </button></a></td>
+        <td class="result_id"><a href="./downloadfile?_id={{ item.result_id }}"><button type="submit">{{ item.result_id }} </button></a></td>
+        <td class="deleter"><a href="./remove?_id={{ item._id }}"><button type="submit">DELETE</button></a></td>
+        <td class="stdout"><a href="./view_stdout?_id={{ item._id }}"><button type="submit">STDOUT</button></a></td>
+        <td class="stderr"><a href="./view_stderr?_id={{ item._id }}"><button type="submit">STDERR</button></a></td>
+    </tr>
+{% endfor %}

@@ -80,6 +80,11 @@ def add_job():
 def frontend():
     return render_template('frontend.html', items=list(db.queue.find()))
 
+@app.route('/render_table')
+def render_table():
+    print('rendering table')
+    return render_template('table.html', items=list(db.queue.find()))
+
 @app.route('/remove')
 def remove():
     
