@@ -1,16 +1,10 @@
-<form action="/new" method="POST">
-  <input type="text" name="name"></input>
-  <input type="text" name="Dockerfile"></input>
-  <input type="text" name="meta"></input>
-  <input type="submit"></input>
-</form>
-
 <b><big>Queue:</big></b>
     <table>
         <tr id="row">
             <th class="status">Status</th>
-            <th class="data_id">data_id</th>
-            <th class="result_id">result_id</th>
+            <th class="status">UTC</th>
+            <th class="data_id">input</th>
+            <th class="result_id">output</th>
             <th class="deleter">Delete</th>
             <th class="stdout">stdout</th>
             <th class="stderr">stderr</th>
@@ -18,7 +12,8 @@
     {% for item in items %}
         <tr class="datas">
             <td class="status">{{ item.status }}</td>
-            <td class="data_id"><a href="./downloadfile?_id={{ item.data_id }}"><button type="submit">{{ item.data_id }} </button></a></td>
+            <td class="date">{{ item.date }}</td>
+            <td class="data_id"><a href="./downloadfile?_id={{ item.data_id }}"><button type="submit">DOWNLOAD </button></a></td>
             <td class="result_id"><a href="./downloadfile?_id={{ item.result_id }}"><button type="submit">{{ item.result_id }} </button></a></td>
             <td class="deleter"><a href="./remove?_id={{ item._id }}"><button type="submit">DELETE</button></a></td>
             <td class="stdout"><a href="./view_stdout?_id={{ item._id }}"><button type="submit">STDOUT</button></a></td>
