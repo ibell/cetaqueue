@@ -10,8 +10,32 @@ services:
       - 5000:5000
     links:
       - mongo
+      - worker
+      - rabbitmq
     environment:
       WAIT_HOSTS: mongo:27017  
+            
+  worker:
+    build:
+      context: ./
+      dockerfile: celery.Dockerfile
+    command:
+      celery -A tasks worker -b amqp://rooty:passy@rabbitmq// --loglevel=info 
+    links:
+      - rabbitmq
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+
+  rabbitmq:
+    image: rabbitmq:3
+    restart: always
+    ports:
+      - 5762:5762
+    environment:
+      RABBITMQ_DEFAULT_USER: rooty
+      RABBITMQ_DEFAULT_PASS: passy
 
 #  mongo-express:
 #    image: mongo-express

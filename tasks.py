@@ -12,8 +12,11 @@ from pymongo import MongoClient
 import gridfs
 from bson import ObjectId
 
+from celery import Celery
+app = Celery('tasks', broker='pyamqp://rooty:passy@rabbitmq//')
+
 print('about to connect to db')
-client = pymongo.MongoClient('outside',
+client = pymongo.MongoClient('mongo',
         username='rooty',
         password='passy')
 print('connected to db')
@@ -107,7 +110,7 @@ class StdOutTeer(object):
     def flush(self):
         pass
     
-def subprocess_redirected(cmd, path, **kwargs):
+def subprocess_redirected(command, path, **kwargs):
     """
     Run a subprocess, piping all output to terminal via parallel stdout and stderr pipes,
     as well as to temporary files.
@@ -151,20 +154,15 @@ def subprocess_redirected(cmd, path, **kwargs):
     for fname in path_err, path_out:
         if os.path.exists(fname):
             os.remove(fname)
-    
-try:
-    while True:
-        time.sleep(0.01)
-        job = None
-        #
-        with client.start_session(causal_consistency=True) as session:
-            grid_out = queue.find_one({"status": "waiting"}, no_cursor_timeout=True, session=session)
 
-            if grid_out is not None:
-                # Set the flag (atomically) - I own the job now
+@app.task
+def add(x,y):
+    return x+y
 
-                queue.update_one({'_id': grid_out['_id']}, {'$set': {'status': 'running'}}, session=session)
-                job = grid_out
+@app.task
+def run_Dockerfile(job_id):
+    try:
+        job = queue.find_one({'_id': ObjectId(job_id)})
 
         if job is not None:
             with tempfile.TemporaryDirectory() as tmpdirname:
@@ -174,7 +172,7 @@ try:
                 
                 try:
                     with StdOutTeer(open(stdout_path,'w')) as redir_out, \
-                         StdErrTeer(open(stderr_path,'w')) as redir_err:
+                        StdErrTeer(open(stderr_path,'w')) as redir_err:
                             
                         # Write the Dockerfile from the job spec
                         Dockerfile = job['Dockerfile'] + foot
@@ -186,6 +184,9 @@ try:
                         # Grab the docker-compose file for the build
                         shutil.copy2('/docker-compose.yml',tmpdirname)
                         shutil.copy2('/worker_entrypoint.sh',tmpdirname)
+
+                        subprocess_redirected('ls -al', tmpdirname, shell=True, cwd=tmpdirname)
+
 
                         # Print it out, just for debugging
                         print('docker-compose\n==========')
@@ -258,7 +259,7 @@ try:
 
             print(queue.find_one({'_id': job['_id']}))
 
-except KeyboardInterrupt:
-    print('Stopping...')
-    
-print('Goodbye...')
+    except KeyboardInterrupt:
+        print('Stopping...')
+        
+    print('Goodbye...')

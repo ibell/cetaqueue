@@ -5,6 +5,7 @@ from bson.objectid import ObjectId
 import gridfs
 from werkzeug import secure_filename
 from ansi2html import Ansi2HTMLConverter
+from tasks import run_Dockerfile
 
 app = Flask(__name__)
 
@@ -27,7 +28,11 @@ def add_job():
             'data_id': data_id,
             'result_id': None
         }
-        job_id = db.queue.insert_one(job_info)
+        
+        job_id = str(db.queue.insert_one(job_info).inserted_id)
+        
+        # Tell celery to run the job
+        run_Dockerfile.delay(job_id)
         
         print('job pushed to db @ '+str(job_id))
             

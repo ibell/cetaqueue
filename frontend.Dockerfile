@@ -1,8 +1,9 @@
 FROM continuumio/miniconda3
 
-RUN apt-get update -y -qq && pip install pymongo flask ansi2html
+RUN apt-get update -y -qq && pip install pymongo flask ansi2html celery
 
 COPY frontend.py .
+COPY tasks.py .
 COPY templates templates
 
 ## Add the wait script to the image
