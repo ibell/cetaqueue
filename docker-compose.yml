@@ -13,8 +13,8 @@ services:
       - worker
       - rabbitmq
     environment:
-      WAIT_HOSTS: mongo:27017  
-      MAIL_PASSWORD: "${MAIL_PASSWORD}"
+      - WAIT_HOSTS=mongo:27017  
+      - MAIL_PASSWORD
             
   worker:
     build:
