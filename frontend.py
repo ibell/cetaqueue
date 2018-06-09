@@ -48,9 +48,10 @@ def add_job():
         # Tell celery to run the job
         run_Dockerfile.delay(job_id)
 
-        msg = Message("Job started", recipients=['ian.h.bell@gmail.com'], html="Added "+str(job_id) + '@' + str(job_info['date']))
-        mail.send(msg)
-
+        recipient = request.form.get('email-start', None)
+        if recipient is not None:
+            msg = Message("Job started", recipients=[recipient], html="Added "+str(job_id) + '@' + str(job_info['date']))
+            mail.send(msg)
         
         print('job pushed to db @ '+str(job_id))
             
@@ -121,19 +122,6 @@ def downloadfile():
     response.headers['Content-Disposition'] = cd 
     response.mimetype = file_.mimetype
     return response
-
-@app.route('/new', methods=['POST'])
-def new():
-
-    item_doc = {
-        'name': request.form['name'],
-        'Dockerfile': request.form['Dockerfile'],
-        'meta': request.form['meta'],
-        'status': 'waiting'
-    }
-    db.queue.insert_one(item_doc)
-
-    return redirect(url_for('frontend'))
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', debug=True)
