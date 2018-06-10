@@ -8,7 +8,7 @@ dname = os.path.join(os.path.dirname(__file__),'simple.Dockerfile')
 if __name__=='__main__':
     
     parser = argparse.ArgumentParser(description='Push some simple jobs')
-    parser.add_argument('N', type=int, nargs=1, help='an integer for the accumulator',default=1)
+    parser.add_argument('N', type=int, nargs=1, help='number of jobs to push',default=[1])
     args = parser.parse_args()
 
     for _ in range(args.N[0]):

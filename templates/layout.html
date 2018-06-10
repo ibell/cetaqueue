@@ -1,47 +1,91 @@
 
-# see http://flask.pocoo.org/docs/1.0/patterns/jquery/?highlight=ajax
 
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-<script>window.jQuery || document.write('<script src="{{
-  url_for('static', filename='jquery.js') }}">\x3C/script>')</script>
+<!DOCTYPE HTML>
+<html>
+<head>
 
-<script type=text/javascript>
-  $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
-
-  $(function() {
-    $('#Refresh').on('click', function() {
-      console.log('starting refresh from ' + $SCRIPT_ROOT + '/render_table');
-      $.get($SCRIPT_ROOT + '/render_table', 
-      {},  // No arguments
-      function(data) {
-        console.log('got this text: '+data);
-        $("#table_contents").html(data);
-      })
-      .fail(function() {
-          alert( "error" );
-      });
-    });
-  });
-</script>
-
-<div id="container">
-    <button id="Refresh">Refresh</button>
-</div>
+    <title> CetaQueue - Docker-based job queueing system </title>
     
-<b><big>Queue:</big></b>
-<table>
-    <thead>
-    <tr id="header_row">
-        <th class="status">Status</th>
-        <th class="status">UTC</th>
-        <th class="data_id">input</th>
-        <th class="result_id">output</th>
-        <th class="deleter">Delete</th>
-        <th class="stdout">stdout</th>
-        <th class="stderr">stderr</th>
-    </tr>
-    </thead>
-    <tbody id="table_contents">
-        {% block content %}{% endblock %}
-    </tbody>
-</table>
+    
+    <script type=text/javascript>
+    // Notes for me:
+    // see http://flask.pocoo.org/docs/1.0/patterns/jquery/?highlight=ajax
+    </script>
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.1.1/socket.io.slim.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="{{ url_for('static', filename='jquery.js') }}">\x3C/script>')</script>
+
+    <script type="text/javascript" charset="utf-8">
+
+    // Handler to do an AJAX update of the table
+    // when requested by SocketIO
+    
+        $(document).ready(function() {
+    
+            var socket = io.connect('http://' + document.domain + ':' + location.port + '/test');
+    
+            socket.on('my_response', function(msg) {
+                console.log('SocketIO request ' + $SCRIPT_ROOT + '/render_table');
+                $.get($SCRIPT_ROOT + '/render_table', 
+                {},  // No arguments
+                function(data) {
+                    $("#table_contents").html(data);
+                })
+                .fail(function() {
+                    alert( "error" );
+                });
+            });
+            
+            socket.onclose = function() {
+                console.info( 'Socket is now closed. Why?' );
+            }
+        
+            window.addEventListener("beforeunload", function() {
+                console.log("Close web socket");
+                socket.close();
+            });
+        });
+    
+    $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
+
+    $(function() {
+        $('#Refresh').on('click', function() {
+        console.log('refresh requested... from ' + $SCRIPT_ROOT + '/render_table');
+        $.get($SCRIPT_ROOT + '/render_table', 
+        {},  // No arguments
+        function(data) {
+            $("#table_contents").html(data);
+        })
+        .fail(function() {
+            alert( "error" );
+        });
+        });
+    });
+    </script>
+</head>
+
+<body>
+    <div id="container">
+        <button id="Refresh">Refresh</button>
+    </div>
+        
+    <b><big>Queue:</big></b>
+    <table>
+        <thead>
+        <tr id="header_row">
+            <th class="status">Status</th>
+            <th class="status">UTC</th>
+            <th class="data_id">input</th>
+            <th class="result_id">output</th>
+            <th class="deleter">Delete</th>
+            <th class="stdout">stdout</th>
+            <th class="stderr">stderr</th>
+        </tr>
+        </thead>
+        <tbody id="table_contents">
+            {% block content %}{% endblock %}
+        </tbody>
+    </table>
+</body>
+</html>

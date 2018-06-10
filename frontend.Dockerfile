@@ -1,6 +1,6 @@
 FROM continuumio/miniconda3
 
-RUN apt-get update -y -qq && pip install pymongo flask ansi2html celery Flask-Mail
+RUN apt-get update -y -qq && pip install pymongo flask ansi2html celery Flask-Mail flask-socketio eventlet
 
 COPY frontend.py .
 COPY tasks.py .

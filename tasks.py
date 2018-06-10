@@ -7,6 +7,7 @@ import sys
 import os
 import shutil
 
+import requests
 import pymongo
 from pymongo import MongoClient
 import gridfs
@@ -14,6 +15,10 @@ from bson import ObjectId
 
 from celery import Celery
 app = Celery('tasks', broker='pyamqp://rooty:passy@rabbitmq//')
+
+def async_update():
+    r = requests.post('http://frontend:5000/async_update')
+    print('update:', r.status_code, r.text)
 
 print('about to connect to db')
 client = pymongo.MongoClient('mongo',
@@ -258,6 +263,8 @@ def run_Dockerfile(job_id):
                     }})
 
             print(queue.find_one({'_id': job['_id']}))
+            async_update()
+            print('Requested a refresh')
 
     except KeyboardInterrupt:
         print('Stopping...')

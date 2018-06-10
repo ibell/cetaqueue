@@ -8,7 +8,7 @@ from werkzeug import secure_filename
 from ansi2html import Ansi2HTMLConverter
 from tasks import run_Dockerfile
 from flask_mail import Message, Mail
-
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 # To use google, also need to enable less secure apps in google account
@@ -21,6 +21,10 @@ app.config.update(
   MAIL_DEFAULT_SENDER='ian.h.bell@gmail.com'
 )
 mail = Mail(app)
+
+# Add SocketIO support
+app.config['SECRET_KEY']= 'secret!'
+socketio = SocketIO(app)
 
 client = MongoClient('mongo', 27017,
                      username='rooty',
@@ -53,6 +57,7 @@ def add_job():
             msg = Message("Job started", recipients=[recipient], html="Added "+str(job_id) + '@' + str(job_info['date']))
             mail.send(msg)
         
+        socketio.emit('my_response', {'data': 'job added!'}, namespace='/test')
         print('job pushed to db @ '+str(job_id))
             
         return redirect(url_for('frontend'))
@@ -78,12 +83,17 @@ def add_job():
     
 @app.route('/')
 def frontend():
-    return render_template('frontend.html', items=list(db.queue.find()))
+    return render_template('frontend.html', items=list(db.queue.find()), async_mode=socketio.async_mode)
 
 @app.route('/render_table')
 def render_table():
-    print('rendering table')
     return render_template('table.html', items=list(db.queue.find()))
+
+@app.route('/async_update', methods=['POST'])
+def async_update():
+    print('async_update')
+    socketio.emit('my_response', {'data': 'got it!'}, namespace='/test')
+    return 'async_update requested'
 
 @app.route('/remove')
 def remove():
@@ -129,4 +139,5 @@ def downloadfile():
     return response
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', debug=True)
+    socketio.run(app, host='0.0.0.0',debug=True)
+    # app.run(host='0.0.0.0', debug=True)
